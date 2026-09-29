@@ -336,14 +336,15 @@ class NotificationService {
             info: "bi-info-circle-fill text-primary"
         };
         
+        const esc = (typeof window !== 'undefined' && window.escapeHtml) ? window.escapeHtml : (v => String(v ?? ''));
         const toastHtml = `
             <div id="${toastId}" class="toast align-items-center text-white bg-${type === "error" ? "danger" : type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
                 <div class="d-flex">
                     <div class="toast-body d-flex align-items-center">
                         <i class="bi ${icons[type] || icons.info} me-2" style="font-size: 1.25rem;"></i>
                         <div>
-                            ${title ? `<strong>${title}</strong><br>` : ""}
-                            ${message}
+                            ${title ? `<strong>${esc(title)}</strong><br>` : ""}
+                            ${esc(message)}
                         </div>
                     </div>
                     <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>

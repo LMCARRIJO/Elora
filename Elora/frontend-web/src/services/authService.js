@@ -282,28 +282,16 @@ class AuthService {
      * @returns {string} Relative URL correct for current location
      */
     resolveUrl(url) {
-        const clean = url.replace(/^\//, '');
-        // Novo layout: src/pages/<categoria>/* (auth, busca, dashboards...) + compatibilidade com /pages/
+        let clean = url.replace(/^\//, '');
+        // normaliza: src/pages/... -> pages/... (relativo à pasta src/)
+        if (clean.startsWith('src/')) clean = clean.slice(4);
         const path = window.location.pathname;
-        const inNewPages = path.includes('/src/pages/') || path.includes('/pages/');
-        if (inNewPages) {
-            // normaliza mapa antigo /pages/ -> src/pages/
-            let target = clean;
-            if (target.startsWith('pages/')) target = target.replace('pages/', 'src/pages/');
-            // profundidade: src/pages/<cat>/file.html = 3 níveis até frontend-web
-            const depth = (path.match(/\/src\/pages\//) ? 3 : 1);
-            // quando já dentro de src/pages, resolve relativo
-            if (target.startsWith('src/pages/')) {
-                // conta quantos ../ precisa para voltar à raiz frontend-web
-                const up = depth === 3 ? '../../../' : '';
-                // se target é login (auth), retorna relativo correto
-                // simplifica: retorna caminho relativo a partir da página atual
-                const currentDir = path.substring(0, path.lastIndexOf('/')+1);
-                // Usa URL API para resolver relativo corretamente
-                try { return new URL(target, window.location.origin + currentDir).pathname.replace(/^\//,''); } catch(e){ return target; }
-            }
-            if (target === 'index.html' || target === 'src/index.html') return '../../../index.html';
-            return target;
+        const inPages = path.includes('/src/pages/') || path.includes('/pages/');
+        if (inPages) {
+            // index fica na raiz frontend-web/ (3 níveis acima de src/pages/<cat>/)
+            if (clean === 'index.html') return '../../../index.html';
+            if (clean.startsWith('pages/')) return '../../' + clean;
+            return clean;
         }
         return clean;
     }
@@ -329,7 +317,7 @@ class AuthService {
      */
     getLoginUrl(redirect = '') {
         const base = this.resolveUrl("/src/pages/auth/login.html");
-        return redirect ? `${base}?redirect=${redirect}` : base;
+        return redirect ? `${base}?redirect=${encodeURIComponent(redirect)}` : base;
     }
 
     /**
@@ -555,9 +543,11 @@ class AuthService {
             throw new Error("E-mail inválido");
         }
         
-        // Validate CPF format (basic)
-        if (data.cpf && !CONFIG.VALIDATION.cpf.test(data.cpf)) {
-            throw new Error("CPF inválido");
+        // Validate CPF: 11 dígitos + dígitos verificadores (validateCPF global de app.js; fallback só-dígitos)
+        if (data.cpf) {
+            const digits = CONFIG.normalizeCPF(data.cpf);
+            const ok = (typeof validateCPF === "function") ? validateCPF(digits) : /^\d{11}$/.test(digits);
+            if (!ok) throw new Error("CPF inválido");
         }
         
         // Validate password strength
@@ -602,7 +592,9 @@ class AuthService {
                 return null;
         }
         
-        return users.find(u => u.cpf === data.cpf || u.email === data.email);
+        // Compara por dígitos normalizados (aceita com/sem máscara) + e-mail
+        const dataCpf = CONFIG.normalizeCPF(data.cpf);
+        return users.find(u => (u.cpf && CONFIG.normalizeCPF(u.cpf) === dataCpf && dataCpf.length === 11) || u.email === data.email);
     }
 
     /**
