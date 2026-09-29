@@ -66,15 +66,16 @@ class RelatorioFlowTest {
         vinculo.setUsuario(admin);
         vinculo.setPerfil(perfilRepository.findByNome("admin").orElseThrow());
         usuarioPerfilRepository.save(vinculo);
-        jdbc.update("INSERT INTO pagamento (valor_bruto, valor_taxa, valor_liquido, metodo, status, criado_em)"
-                + " VALUES (100.00, 10.00, 90.00, 'pix', 'aprovado', CURRENT_TIMESTAMP)");
-        jdbc.update("INSERT INTO pagamento (valor_bruto, valor_taxa, valor_liquido, metodo, status, criado_em)"
-                + " VALUES (200.00, 20.00, 180.00, 'cartao', 'pendente', DATEADD('DAY', -40, CURRENT_TIMESTAMP))");
-        jdbc.update("INSERT INTO repasse (valor, status) VALUES (90.00, 'pendente')");
         jdbc.update("INSERT INTO contrato (codigo, cliente_id, profissional_id, titulo, status, valor_hora, criado_em, atualizado_em) VALUES ('TST-001', ?, ?, 'Teste', 'ativo', 50.00, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", clienteId, adminId);
         jdbc.update("INSERT INTO contrato (codigo, cliente_id, profissional_id, titulo, status, valor_hora, criado_em, atualizado_em) VALUES ('TST-002', ?, ?, 'Teste 2', 'ativo', 50.00, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", adminId, clienteId);
         Integer c1 = jdbc.queryForObject("SELECT id_contrato FROM contrato WHERE codigo='TST-001'", Integer.class);
         Integer c2 = jdbc.queryForObject("SELECT id_contrato FROM contrato WHERE codigo='TST-002'", Integer.class);
+        jdbc.update("INSERT INTO pagamento (contrato_id, pagador_id, valor_bruto, valor_taxa, valor_liquido, metodo, status, idempotency_key, criado_em, atualizado_em)"
+                + " VALUES (?, ?, 100.00, 10.00, 90.00, 'pix', 'aprovado', 'rel-001', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", c1, clienteId);
+        jdbc.update("INSERT INTO pagamento (contrato_id, pagador_id, valor_bruto, valor_taxa, valor_liquido, metodo, status, idempotency_key, criado_em, atualizado_em)"
+                + " VALUES (?, ?, 200.00, 20.00, 180.00, 'cartao', 'pendente', 'rel-002', DATEADD('DAY', -40, CURRENT_TIMESTAMP), DATEADD('DAY', -40, CURRENT_TIMESTAMP))", c2, clienteId);
+        Integer p1 = jdbc.queryForObject("SELECT id_pagamento FROM pagamento WHERE idempotency_key='rel-001'", Integer.class);
+        jdbc.update("INSERT INTO repasse (pagamento_id, profissional_id, valor, status) VALUES (?, ?, 90.00, 'pendente')", p1, adminId);
         jdbc.update("INSERT INTO avaliacao (contrato_id, avaliador_id, avaliado_id, nota, criado_em) VALUES (?, ?, ?, 5, CURRENT_TIMESTAMP)", c1, clienteId, adminId);
         jdbc.update("INSERT INTO avaliacao (contrato_id, avaliador_id, avaliado_id, nota, criado_em) VALUES (?, ?, ?, 3, CURRENT_TIMESTAMP)", c2, adminId, clienteId);
         jdbc.update("INSERT INTO denuncia (status) VALUES ('aberta')");
